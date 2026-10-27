@@ -1,0 +1,50 @@
+name: Agents (plan, build, review, analyse, notify)
+
+on:
+  schedule:
+    # Every 3 hours. Runs with nothing to do make no model calls and finish
+    # in about a minute, keeping Actions minutes well inside the free tier.
+    - cron: "23 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Single command to run (blank runs the full cycle)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agents
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: agents
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ".[skills]"
+      - name: Run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          COMMAND: ${{ github.event.inputs.command }}
+        run: |
+          if [ -n "$COMMAND" ]; then
+            case "$COMMAND" in
+              plan|build|review|analyse|notify|sync-skills|cycle) hackagent "$COMMAND" ;;
+              *) echo "Unknown command"; exit 1 ;;
+            esac
+          else
+            hackagent cycle
+          fi

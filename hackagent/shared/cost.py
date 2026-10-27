@@ -12,6 +12,7 @@ keeps spend well under it.
 from __future__ import annotations
 
 import enum
+import re
 import threading
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -131,7 +132,7 @@ class BudgetGuard:
         self._lock = threading.Lock()
         self._month: Decimal | None = None
         self._events: dict[str, Decimal] = {}
-        # Per-event budget extensions granted by the owner during this run.
+        # Per-event budget extensions granted by the owner (loaded lazily).
         self._extra: dict[str, Decimal] = {}
 
     # -- reads ---------------------------------------------------------------
@@ -157,10 +158,33 @@ class BudgetGuard:
             return self._events[event_id]
 
     def event_limit(self, event_id: str) -> Decimal:
-        return self.limits.event_budget + self._extra.get(event_id, Decimal(0))
+        if event_id not in self._extra:
+            self._extra[event_id] = self._approved_extensions(event_id)
+        return self.limits.event_budget + self._extra[event_id]
 
-    def grant_extension(self, event_id: str, amount: Decimal) -> None:
-        self._extra[event_id] = self._extra.get(event_id, Decimal(0)) + amount
+    def refresh_extensions(self, event_id: str) -> None:
+        self._extra.pop(event_id, None)
+
+    def _approved_extensions(self, event_id: str) -> Decimal:
+        """Extensions the owner granted by answering budget_extension requests.
+
+        A reply of "yes" adds one more event budget; a number adds that many
+        dollars (capped at $5 per reply). Anything else grants nothing.
+        """
+        total = Decimal(0)
+        rows = self.store.select(
+            "input_requests",
+            {"event_id": event_id, "kind": "budget_extension", "status": "answered"},
+            columns="response",
+        )
+        for r in rows:
+            reply = (r.get("response") or "").strip().lower()
+            m = re.fullmatch(r"\$?\s*(\d+(?:\.\d+)?)", reply)
+            if m:
+                total += min(Decimal(m.group(1)), Decimal(5))
+            elif reply in {"yes", "y", "continue", "approve", "approved"}:
+                total += self.limits.event_budget
+        return total
 
     # -- enforcement ---------------------------------------------------------
 

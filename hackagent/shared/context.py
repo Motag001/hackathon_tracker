@@ -126,3 +126,58 @@ def agent_run(ctx: Context, agent: str) -> Iterator[dict[str, Any]]:
             {"status": status, "error": error, "stats": stats, "finished_at": now_iso()},
         )
         budget_alerts(ctx)
+
+
+def pause_for_budget(ctx: Context, event: dict[str, Any], err: BudgetExceeded) -> None:
+    """Stop condition (section 10): pause the event and ask the owner."""
+    if err.kind != "event_budget":
+        raise err  # monthly cap / pause line: stop the whole run
+    n = len(
+        ctx.store.select(
+            "input_requests", {"event_id": event["id"], "kind": "budget_extension"}, columns="id"
+        )
+    )
+    ctx.store.insert(
+        "input_requests",
+        {
+            "event_id": event["id"],
+            "key": f"budget_extension_{n + 1}",
+            "kind": "budget_extension",
+            "description": f"{err} Reply 'yes' to add another "
+            f"${ctx.guard.limits.event_budget} for this event, a dollar amount (max $5), or 'no'.",
+        },
+    )
+    ctx.store.update(
+        "events", {"id": event["id"]}, {"status": "paused_budget", "paused_from": event["status"]}
+    )
+    raise_alert(
+        ctx.store,
+        "input_needed",
+        f"Budget reached: {event['title'][:120]}",
+        f"budget:{event['id']}:{n + 1}",
+        event_id=event["id"],
+        body=str(err),
+    )
+
+
+def resume_budget_paused(ctx: Context) -> int:
+    """Resume paused events once the owner has answered the extension request."""
+    resumed = 0
+    for ev in ctx.store.select("events", {"status": "paused_budget"}):
+        pending = ctx.store.select(
+            "input_requests",
+            {"event_id": ev["id"], "kind": "budget_extension", "status": "pending"},
+            columns="id",
+            limit=1,
+        )
+        if pending:
+            continue
+        ctx.guard.refresh_extensions(ev["id"])  # re-read the owner's answers
+        if ctx.guard.event_limit(ev["id"]) > ctx.guard.event_spend(ev["id"]):
+            ctx.store.update(
+                "events",
+                {"id": ev["id"]},
+                {"status": ev.get("paused_from") or "building", "paused_from": None},
+            )
+            resumed += 1
+    return resumed

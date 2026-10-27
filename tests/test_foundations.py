@@ -79,8 +79,23 @@ def test_budget_guard_event_budget_and_extension():
     with pytest.raises(BudgetExceeded) as e:
         g.check(Decimal("0.10"), priority=Priority.ESSENTIAL, event_id="e1")
     assert e.value.kind == "event_budget"
-    g.grant_extension("e1", Decimal("0.5"))
+    g.store.insert(
+        "input_requests",
+        {"event_id": "e1", "kind": "budget_extension", "status": "answered", "response": "$0.50"},
+    )
+    g.refresh_extensions("e1")
     g.check(Decimal("0.10"), priority=Priority.ESSENTIAL, event_id="e1")
+    g.store.insert(
+        "input_requests",
+        {
+            "event_id": "e1",
+            "kind": "budget_extension",
+            "status": "answered",
+            "response": "no thanks",
+        },
+    )
+    g.refresh_extensions("e1")
+    assert g.event_limit("e1") == Decimal("2.00")
 
 
 def test_record_updates_running_totals():

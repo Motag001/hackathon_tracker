@@ -129,6 +129,8 @@ create table public.events (
     themes                text[] not null default '{}',
     registrants           integer,
     status                public.event_status not null default 'discovered',
+    -- Status to return to when a budget pause is lifted.
+    paused_from           public.event_status,
     raw                   jsonb not null default '{}'::jsonb,
     first_seen_at         timestamptz not null default now(),
     last_seen_at          timestamptz not null default now(),
@@ -201,6 +203,8 @@ create table public.plans (
     skills           text[] not null default '{}',
     inputs_needed    jsonb not null default '[]'::jsonb,
     disclosure_draft text,
+    risks            jsonb not null default '[]'::jsonb,
+    warnings         jsonb not null default '[]'::jsonb,
     revision_notes   text,
     model            text,
     created_at       timestamptz not null default now(),

@@ -2,6 +2,9 @@
 
 hackagent intake          # discover -> rules -> score
 hackagent discover | rules | score
+hackagent plan            # draft plans for approved events, activate approved plans
+hackagent notify          # deadline alerts, weekly / monthly summaries
+hackagent sync-skills     # push skills/registry.json to the skills table
 hackagent keepalive
 """
 
@@ -49,6 +52,24 @@ def _score(ctx: Context) -> dict[str, Any]:
     return scout.run(ctx)
 
 
+def _plan(ctx: Context) -> dict[str, Any]:
+    from hackagent.agents import planner
+
+    return planner.run(ctx)
+
+
+def _notify(ctx: Context) -> dict[str, Any]:
+    from hackagent.agents import notifier
+
+    return notifier.run(ctx)
+
+
+def _sync_skills(ctx: Context) -> dict[str, Any]:
+    from hackagent.skills import registry
+
+    return {"skills": registry.sync(ctx.store)}
+
+
 def _keepalive(ctx: Context) -> dict[str, Any]:
     # A trivial read keeps the free-tier Supabase project from pausing.
     rows = ctx.store.select("settings", {"id": 1}, columns="id", limit=1)
@@ -60,6 +81,9 @@ COMMANDS: dict[str, Callable[[Context], dict[str, Any]]] = {
     "discover": _discover,
     "rules": _rules,
     "score": _score,
+    "plan": _plan,
+    "notify": _notify,
+    "sync-skills": _sync_skills,
     "keepalive": _keepalive,
 }
 
