@@ -2,14 +2,11 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
-const SIGN_IN_HELP: Record<string, string> = {
-  invalid_credentials:
-    "OWNER_EMAIL or OWNER_PASSWORD in Vercel does not match the Supabase user. Update the " +
-    "Vercel variables (or reset the password in Supabase → Authentication → Users), then redeploy.",
-  email_not_confirmed:
-    "The owner's email is not confirmed. In Supabase → Authentication → Users, open the user " +
-    "and confirm it (or recreate it with Auto Confirm User ticked).",
-  over_request_rate_limit: "Supabase is rate limiting sign-ins. Wait a minute and reload.",
+const DB_HELP: Record<string, string> = {
+  bad_secret:
+    "Supabase rejected the dashboard's token. SUPABASE_JWT_SECRET in Vercel must be the " +
+    "project's JWT secret (Supabase → Settings → API → JWT Settings → Legacy JWT secret). " +
+    "Update it, then redeploy.",
   network:
     "The dashboard could not reach Supabase. Check that the project is not paused, that " +
     "Settings → Network restrictions allows outside traffic, and that NEXT_PUBLIC_SUPABASE_URL " +
@@ -18,10 +15,11 @@ const SIGN_IN_HELP: Record<string, string> = {
 
 const REASONS: Record<string, { title: string; body: string }> = {
   config: {
-    title: "Owner credentials are not configured",
+    title: "The dashboard is not configured yet",
     body:
-      "Add OWNER_EMAIL and OWNER_PASSWORD to the Vercel project's environment variables " +
-      "(type Sensitive, Production only), then redeploy.",
+      "Add two environment variables to the Vercel project (type Sensitive, Production), then " +
+      "redeploy: OWNER_USER_ID, your user's UID from Supabase → Authentication → Users; and " +
+      "SUPABASE_JWT_SECRET, from Supabase → Settings → API → JWT Settings (Legacy JWT secret).",
   },
   setup: {
     title: "The database is not set up",
@@ -30,10 +28,10 @@ const REASONS: Record<string, { title: string; body: string }> = {
       "public.app_owner, then reload.",
   },
   "not-owner": {
-    title: "This user is not registered as the owner",
+    title: "OWNER_USER_ID is not registered as the owner",
     body:
-      "Insert the OWNER_EMAIL user into public.app_owner in the Supabase SQL editor (see the " +
-      "README), then reload.",
+      "Insert that user into public.app_owner in the Supabase SQL editor (see the README), or " +
+      "correct OWNER_USER_ID in Vercel and redeploy.",
   },
 };
 
@@ -44,11 +42,11 @@ export default async function Status({
 }) {
   const { reason = "", code = "" } = await searchParams;
   const known = REASONS[reason];
-  const title = known?.title ?? "Could not sign in to Supabase";
+  const title = known?.title ?? "Could not read the database";
   const body =
     known?.body ??
-    SIGN_IN_HELP[code] ??
-    `Supabase refused the automatic sign-in${code ? ` (${code.slice(0, 60)})` : ""}.`;
+    DB_HELP[code] ??
+    `Supabase returned an error${code ? ` (${code.slice(0, 60)})` : ""}. Check the Vercel logs.`;
   return (
     <main className="auth card">
       <h1>{title}</h1>

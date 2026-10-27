@@ -65,15 +65,15 @@ Agents communicate only through database records and statuses.
   `supabase/tests/test_gates.sql`.
 * **Single user.** A singleton `app_owner` table; RLS on every table restricts
   reads and writes to that user. Disable sign-ups in Supabase.
-* **No sign-in page (owner's choice).** The dashboard signs in to Supabase as
-  the owner on the server, using `OWNER_EMAIL` / `OWNER_PASSWORD` (server-only
-  Vercel variables, never sent to the browser). RLS and the gate triggers work
+* **No sign-in (owner's choice).** The dashboard has no login, password or
+  session. On the server it mints a 5-minute Supabase token for
+  `OWNER_USER_ID`, signed with `SUPABASE_JWT_SECRET` (server-only Vercel
+  variables, never sent to the browser). RLS and the gate triggers work
   unchanged, so the agents still cannot approve anything, but **anyone who can
   reach the deployment can act as the owner**. Keep the URL private, or turn on
   Vercel Deployment Protection to put a Vercel login in front of it.
-* **Dashboard holds no service key.** Only the anon key and the owner's
-  password; every server action re-verifies the session (`getClaims`) and
-  validates input with zod. A
+* **Dashboard holds no service-role key.** Every server action validates its
+  input with zod and writes through RLS as the owner. A
   per-request nonce CSP, HSTS, `frame-ancestors 'none'`, no-referrer and
   `no-store` caching are set. Model and web text is always rendered as plain
   text. Artifacts are downloaded through 60-second signed URLs.
@@ -124,9 +124,11 @@ for intake/analysis, Sonnet for plan/build/review, Opus only with approval).
    secrets `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
    Run the *Agents* workflow once with command `sync-skills`.
 4. **Vercel** (Hobby): import the repo with root directory `dashboard`, and set
-   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and the owner's
-   `OWNER_EMAIL` and `OWNER_PASSWORD` (type *Sensitive*). Never the service-role key.
-5. **Dashboard**: open it (there is no sign-in page; `/status` explains any setup
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `OWNER_USER_ID`
+   (your user's UID from *Authentication → Users*) and `SUPABASE_JWT_SECRET`
+   (*Settings → API → JWT Settings*), the last two as type *Sensitive*. Never the
+   service-role key.
+5. **Dashboard**: open it (there is no sign-in; `/status` explains any setup
    problem), fill in your profile, then read each source's terms and enable the
    ones you're comfortable with.
 
