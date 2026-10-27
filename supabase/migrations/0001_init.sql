@@ -224,6 +224,8 @@ create table public.milestones (
     skills         text[] not null default '{}',
     input_keys     text[] not null default '{}',
     needs_top_tier boolean not null default false,
+    model_tier     text,
+    test_report    jsonb,
     status         text not null default 'pending'
         check (status in ('pending', 'blocked', 'in_progress', 'drafted', 'done', 'skipped', 'failed')),
     notes          text,
@@ -288,7 +290,10 @@ create table public.artifacts (
     content_type  text not null,
     size_bytes    integer not null,
     sha256        text not null,
-    created_at    timestamptz not null default now()
+    -- First few thousand characters of text artifacts, for the Reviewer.
+    excerpt       text,
+    created_at    timestamptz not null default now(),
+    unique (event_id, path)
 );
 create index artifacts_event_idx on public.artifacts (event_id);
 
@@ -317,6 +322,7 @@ create table public.submissions (
     disclosure    text not null check (char_length(disclosure) > 0),
     checklist     jsonb not null default '[]'::jsonb,
     review_notes  jsonb not null default '[]'::jsonb,
+    blocking_issues jsonb not null default '[]'::jsonb,
     status        text not null default 'draft' check (status in ('draft', 'ready', 'submitted', 'withdrawn')),
     submitted_at  timestamptz,
     created_at    timestamptz not null default now(),
@@ -702,3 +708,59 @@ on conflict (id) do nothing;
 create policy artifacts_owner_read on storage.objects
     for select to authenticated
     using (bucket_id = 'artifacts' and public.is_owner());
+
+-- ---------------------------------------------------------------------------
+-- Results and performance analytics (section 9)
+-- ---------------------------------------------------------------------------
+
+create or replace function public.results_mark_event()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    update public.events set status = 'results_in'
+    where id = new.event_id and status in ('submitted', 'closed');
+    return new;
+end;
+$$;
+create trigger results_mark_event after insert on public.results
+    for each row execute function public.results_mark_event();
+revoke all on function public.results_mark_event() from anon, authenticated;
+
+-- One row per event that reached planning, for the performance dashboard.
+create view public.event_performance with (security_invoker = true) as
+select
+    e.id as event_id,
+    e.title,
+    e.source_id,
+    e.themes,
+    e.status,
+    e.submission_deadline,
+    s.submitted_at,
+    coalesce(m.planned_hours, 0) as planned_hours,
+    coalesce(m.actual_hours, 0) as actual_hours,
+    m.milestones_with_actuals,
+    coalesce(sp.spent_usd, 0) as spent_usd,
+    r.placement,
+    coalesce(r.prize_won_usd, 0) as prize_won_usd,
+    (r.placement is not null and r.placement <= 3) or coalesce(r.prize_won_usd, 0) > 0 as placed
+from public.events e
+left join lateral (
+    select sum(est_hours) as planned_hours,
+           sum(actual_hours) as actual_hours,
+           count(actual_hours) as milestones_with_actuals
+    from public.milestones mm
+    join public.plans p on p.id = mm.plan_id and p.status = 'approved'
+    where mm.event_id = e.id
+) m on true
+left join lateral (
+    select max(submitted_at) as submitted_at from public.submissions
+    where event_id = e.id and status = 'submitted'
+) s on true
+left join public.event_spend sp on sp.event_id = e.id
+left join public.results r on r.event_id = e.id
+where exists (select 1 from public.plans p2 where p2.event_id = e.id);
+
+revoke select on public.event_performance from anon;

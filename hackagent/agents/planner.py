@@ -155,7 +155,7 @@ def validate(draft: PlanDraft, ctx: Context, skills: set[str]) -> tuple[PlanDraf
             f"Plan totals {total:.0f}h, over the {ctx.settings['max_effort_hours']:.0f}h"
             " limit. Consider cutting scope."
         )
-    if "ai" not in draft.disclosure_draft.lower():
+    if not re.search(r"\b(ai|artificial intelligence|llm|claude)\b", draft.disclosure_draft, re.I):
         warnings.append("Disclosure draft does not mention AI use; it must before submission.")
     if not draft.milestones:
         warnings.append("Plan has no milestones.")

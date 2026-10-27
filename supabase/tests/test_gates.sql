@@ -101,6 +101,19 @@ select pg_temp.expect_error(
 select pg_temp.expect_error(
     $$insert into public.playbook (lesson, status) values ('x', 'active')$$, 'agent activates playbook');
 
+-- Owner records results: event moves to results_in and shows in analytics.
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-000000000001', false);
+insert into public.results (event_id, placement, prize_won_usd) values ('10000000-0000-0000-0000-000000000001', 2, 100);
+do $$ begin
+    if (select status from public.events where id = '10000000-0000-0000-0000-000000000001') <> 'results_in' then
+        raise exception 'event not moved to results_in';
+    end if;
+    if not (select placed from public.event_performance where event_id = '10000000-0000-0000-0000-000000000001') then
+        raise exception 'event_performance not reporting placement';
+    end if;
+end $$;
+select set_config('request.jwt.claim.sub', '', false);
+
 -- RLS: authenticated non-owner sees nothing; owner sees rows.
 grant usage on schema public to authenticated;
 grant select on all tables in schema public to authenticated;
