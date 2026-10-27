@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { signOut } from "@/app/actions";
 import { requireOwner } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -35,9 +34,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
             {href === "/" && !!count && <span className="pill">{count}</span>}
           </Link>
         ))}
-        <form action={signOut} className="nav-end">
-          <button type="submit" className="link">Sign out</button>
-        </form>
       </nav>
       <main className="main">{children}</main>
     </div>

@@ -1,4 +1,4 @@
-import { enrollMfa, saveSettings, toggleSkill, updateSource } from "@/app/actions";
+import { saveSettings, toggleSkill, updateSource } from "@/app/actions";
 import { Flash, Section } from "@/components/ui";
 import { requireOwner } from "@/lib/auth";
 import { fmtDate } from "@/lib/format";
@@ -18,15 +18,13 @@ const PROFILE_EXAMPLE = {
 export default async function Settings({ searchParams }: { searchParams: Promise<{ error?: string; ok?: string }> }) {
   const { error, ok } = await searchParams;
   const { supabase } = await requireOwner();
-  const [settings, sources, skills, factors] = await Promise.all([
+  const [settings, sources, skills] = await Promise.all([
     supabase.from("settings").select("*").eq("id", 1).single(),
     supabase.from("sources").select("*").order("id"),
     supabase.from("skills").select("id,name,enabled,usage_count,success_count").order("id"),
-    supabase.auth.mfa.listFactors(),
   ]);
   const s = settings.data;
   const profile = s?.profile && Object.keys(s.profile).length ? s.profile : PROFILE_EXAMPLE;
-  const mfaOn = !!factors.data?.totp?.some((f) => f.status === "verified");
 
   return (
     <>
@@ -108,16 +106,6 @@ export default async function Settings({ searchParams }: { searchParams: Promise
         {!(skills.data ?? []).length && <p className="muted">Run the &quot;sync-skills&quot; workflow command to load the registry.</p>}
       </Section>
 
-      <Section title="Two-factor authentication">
-        {mfaOn ? (
-          <p className="pass">An authenticator app is enrolled. Sign-in requires a code.</p>
-        ) : (
-          <form action={enrollMfa}>
-            <p>Strongly recommended: add an authenticator app (TOTP).</p>
-            <button className="primary" type="submit">Set up authenticator</button>
-          </form>
-        )}
-      </Section>
     </>
   );
 }

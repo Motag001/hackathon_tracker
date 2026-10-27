@@ -1,7 +1,9 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = ["/login"];
+// Pages that must render without a Supabase session (they explain why there
+// is none). They never trigger the automatic sign-in, so they cannot loop.
+const PUBLIC_PATHS = ["/status"];
 
 function csp(nonce: string): string {
   const isDev = process.env.NODE_ENV === "development";
@@ -9,7 +11,6 @@ function csp(nonce: string): string {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'nonce-${nonce}'`,
-    // TOTP enrolment shows Supabase's QR code as an SVG data URL.
     "img-src 'self' data:",
     "font-src 'self'",
     "connect-src 'self'",
@@ -22,10 +23,17 @@ function csp(nonce: string): string {
 }
 
 /**
- * Runs before every page: sets a per-request CSP nonce, refreshes the
- * Supabase session cookie, and sends anyone not signed in (or signed in
- * without completing MFA) to the right page. Authorisation of the data
- * itself is enforced by row-level security in the database.
+ * Runs before every page: sets a per-request CSP nonce and makes sure there
+ * is a Supabase session for the owner.
+ *
+ * There is no sign-in page. When the request has no valid session, the
+ * proxy signs in on the server with OWNER_EMAIL / OWNER_PASSWORD (server-only
+ * Vercel variables, never sent to the browser) and stores the session in
+ * cookies. Everything then runs as the owner, so row-level security and the
+ * database gate triggers keep working unchanged: the agents still cannot
+ * approve anything on the owner's behalf.
+ *
+ * Anyone who can reach this deployment can use it as the owner.
  */
 export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
@@ -51,11 +59,6 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // getClaims verifies the JWT signature; never trust an unverified session.
-  const { data } = await supabase.auth.getClaims();
-  const path = request.nextUrl.pathname;
-  const isPublic = PUBLIC_PATHS.includes(path);
-
   const redirect = (to: string) => {
     const r = NextResponse.redirect(new URL(to, request.url));
     response.cookies.getAll().forEach((c) => r.cookies.set(c));
@@ -63,13 +66,30 @@ export async function proxy(request: NextRequest) {
     return r;
   };
 
-  if (!data?.claims) {
-    if (!isPublic) return redirect("/login");
-  } else {
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsMfa = aal?.nextLevel === "aal2" && aal.currentLevel !== "aal2";
-    if (needsMfa && path !== "/mfa") return redirect("/mfa");
-    if (!needsMfa && (isPublic || path === "/mfa")) return redirect("/");
+  const path = request.nextUrl.pathname;
+  if (!PUBLIC_PATHS.includes(path)) {
+    // getClaims verifies the JWT signature; never trust an unverified session.
+    const { data } = await supabase.auth.getClaims();
+    if (!data?.claims) {
+      const email = process.env.OWNER_EMAIL;
+      const password = process.env.OWNER_PASSWORD;
+      if (!email || !password) return redirect("/status?reason=config");
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        // Error details only; the credentials are never logged.
+        console.warn("automatic sign-in failed", {
+          name: error.name,
+          code: error.code ?? null,
+          status: error.status ?? null,
+          message: error.message,
+        });
+        const code = (error.code ?? (error.status ? `http_${error.status}` : "network")).replace(
+          /[^a-z0-9_]/gi,
+          "",
+        );
+        return redirect(`/status?reason=signin&code=${code}`);
+      }
+    }
   }
 
   response.headers.set("Content-Security-Policy", policy);

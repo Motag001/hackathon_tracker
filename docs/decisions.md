@@ -26,3 +26,4 @@ changed on the dashboard or in code.
 | 2026-10-27 | Sources disabled until the owner records a terms review | Build, requirement 16 |
 | 2026-10-27 | Agent cycle every 3 hours, intake daily, keep-alive every 3 days (Actions minutes budget) | Build |
 | 2026-10-27 | Dashboard dependencies pinned exactly; Next.js 16.4.2 chosen over 16.4.0 because of critical advisories (GHSA-2464-fhr4-w9xw and others) | Build, security |
+| 2026-10-27 | Dashboard sign-in page removed; the server signs in as the owner with OWNER_EMAIL / OWNER_PASSWORD. DB gates unchanged; anyone with the URL can act as the owner | Owner, after the trade-off was explained |

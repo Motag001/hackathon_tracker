@@ -31,19 +31,10 @@ export function Section({ title, children, aside }: { title: string; children: R
   );
 }
 
-const FLASH: Record<string, string> = {
-  "not-owner":
-    "Signed in, but this account is not registered as the owner. Add it to public.app_owner " +
-    "in the Supabase SQL editor (see the README), then sign in again.",
-  setup:
-    "Signed in, but the database is not set up yet. Run supabase/migrations/0001_init.sql " +
-    "in the Supabase SQL editor, register yourself as the owner, then sign in again.",
-};
 
 export function Flash({ error, ok }: { error?: string; ok?: string }) {
   if (error) {
-    const msg = FLASH[error] ?? error;
-    return <p className="flash error" role="alert">{msg}</p>;
+    return <p className="flash error" role="alert">{error}</p>;
   }
   if (ok) return <p className="flash ok" role="status">Saved.</p>;
   return null;

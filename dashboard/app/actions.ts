@@ -1,12 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { requireOwner } from "@/lib/auth";
-import { supabaseServer } from "@/lib/supabase";
 
 // Server actions: each one re-checks the owner session, validates its input
 // with zod, and leaves authorisation of the write to RLS and the database
@@ -28,94 +26,6 @@ function parse<T extends z.ZodTypeAny>(schema: T, form: FormData, path: string):
   const result = schema.safeParse(Object.fromEntries(form));
   if (!result.success) back(path, result.error.issues.map((i) => i.message).join("; "));
   return result.data;
-}
-
-// --- auth -----------------------------------------------------------------
-
-// Supabase answers "invalid_credentials" for both an unknown email and a
-// wrong password, so these messages do not reveal whether an account exists.
-const SIGN_IN_ERRORS: Record<string, string> = {
-  invalid_credentials: "Wrong email or password.",
-  email_not_confirmed:
-    "This email is not confirmed yet. In Supabase, open Authentication → Users and confirm " +
-    "the user (or recreate it with Auto Confirm User ticked).",
-  over_request_rate_limit: "Too many attempts. Wait a minute and try again.",
-};
-
-export async function signIn(form: FormData) {
-  const input = z
-    .object({ email: z.string().email().max(320), password: z.string().min(1).max(200) })
-    .safeParse(Object.fromEntries(form));
-  if (!input.success) back("/login", "Enter your email and password.");
-  const supabase = await supabaseServer();
-  const { error } = await supabase.auth.signInWithPassword(input.data);
-  if (error) {
-    // Log the Supabase error code only (never the email or password) so
-    // failed sign-ins can be diagnosed from the Vercel runtime logs.
-    console.warn("sign-in failed", { code: error.code ?? null, status: error.status ?? null });
-    back("/login", SIGN_IN_ERRORS[error.code ?? ""] ?? `Sign-in failed (${error.code ?? "unknown"}).`);
-  }
-  redirect("/");
-}
-
-export async function verifyMfa(form: FormData) {
-  const input = z.object({ code: z.string().regex(/^\d{6}$/) }).safeParse(Object.fromEntries(form));
-  if (!input.success) back("/mfa", "Enter the 6-digit code.");
-  const supabase = await supabaseServer();
-  const { data: factors } = await supabase.auth.mfa.listFactors();
-  const totp = factors?.totp?.find((f) => f.status === "verified");
-  if (!totp) back("/mfa", "No verified authenticator found.");
-  const { error } = await supabase.auth.mfa.challengeAndVerify({
-    factorId: totp.id,
-    code: input.data.code,
-  });
-  if (error) back("/mfa", "Code not accepted.");
-  redirect("/");
-}
-
-export async function signOut() {
-  const supabase = await supabaseServer();
-  await supabase.auth.signOut();
-  redirect("/login");
-}
-
-const MFA_COOKIE = "mfa_enroll";
-
-export async function enrollMfa() {
-  const { supabase } = await requireOwner();
-  // Clear abandoned attempts so only one unverified factor exists.
-  const { data: factors } = await supabase.auth.mfa.listFactors();
-  for (const f of factors?.all ?? []) {
-    if (f.factor_type === "totp" && f.status === "unverified") {
-      await supabase.auth.mfa.unenroll({ factorId: f.id });
-    }
-  }
-  const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
-  if (error || !data) back("/settings", "Could not start MFA enrolment.");
-  // The QR code and secret are only returned now; keep them for ten minutes
-  // in an httpOnly cookie scoped to the enrolment page.
-  (await cookies()).set(
-    MFA_COOKIE,
-    JSON.stringify({ id: data.id, qr: data.totp.qr_code, secret: data.totp.secret }),
-    { httpOnly: true, secure: true, sameSite: "strict", path: "/settings/mfa", maxAge: 600 },
-  );
-  redirect("/settings/mfa");
-}
-
-export async function confirmMfa(form: FormData) {
-  const { supabase } = await requireOwner();
-  const input = parse(
-    z.object({ factor: z.string().min(1).max(100), code: z.string().regex(/^\d{6}$/) }),
-    form,
-    "/settings",
-  );
-  const { error } = await supabase.auth.mfa.challengeAndVerify({
-    factorId: input.factor,
-    code: input.code,
-  });
-  if (error) back("/settings/mfa", "Code not accepted.");
-  (await cookies()).delete({ name: MFA_COOKIE, path: "/settings/mfa" });
-  back("/settings?ok=mfa");
 }
 
 // --- gates ------------------------------------------------------------------
