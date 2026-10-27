@@ -45,6 +45,10 @@ jobs:
           # Passed through the environment, never interpolated into the script.
           COMMAND: ${{ github.event.inputs.command }}
         run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::Agents are not configured yet: add ANTHROPIC_API_KEY, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the 'agents' environment secrets (see README). Skipping."
+            exit 0
+          fi
           if [ -n "$COMMAND" ]; then
             case "$COMMAND" in
               plan|build|review|analyse|notify|sync-skills|cycle) hackagent "$COMMAND" ;;

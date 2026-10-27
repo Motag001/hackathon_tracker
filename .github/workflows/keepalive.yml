@@ -22,7 +22,13 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install .
-      - run: hackagent keepalive
+      - name: Ping Supabase
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::warning::Agents are not configured yet: add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the 'agents' environment secrets (see README). Skipping."
+            exit 0
+          fi
+          hackagent keepalive
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

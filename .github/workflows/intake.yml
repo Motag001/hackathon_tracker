@@ -27,7 +27,13 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install .
-      - run: hackagent intake
+      - name: Run intake
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::Agents are not configured yet: add ANTHROPIC_API_KEY, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the 'agents' environment secrets (see README). Skipping."
+            exit 0
+          fi
+          hackagent intake
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
