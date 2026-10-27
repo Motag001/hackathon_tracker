@@ -1,0 +1,18 @@
+{"hackathons": [
+ {"id": 2001, "title": "AI for Africa Hackathon 2026", "url": "https://ai-africa.devpost.com/",
+  "displayed_location": {"icon": "globe", "location": "Online"}, "open_state": "open",
+  "submission_period_dates": "Oct 20 - Dec 15, 2026", "themes": [{"id": 1, "name": "Machine Learning/AI"}, {"id": 2, "name": "Social Good"}],
+  "prize_amount": "$<span data-currency-value>5,000</span>", "registrations_count": 340,
+  "organization_name": "Lagos AI Lab", "invite_only": false},
+ {"id": 2002, "title": "City Builders In-Person", "url": "https://city.devpost.com",
+  "displayed_location": {"icon": "map-marker", "location": "Berlin, Germany"},
+  "submission_period_dates": "Nov 01 - Nov 30, 2026", "themes": [], "prize_amount": "$<span data-currency-value>2,000</span>",
+  "registrations_count": 80, "invite_only": false},
+ {"id": 2003, "title": "Tiny Prize Jam", "url": "https://tiny.devpost.com/",
+  "displayed_location": {"location": "Online"}, "submission_period_dates": "Oct 01 - Dec 01, 2026",
+  "themes": [], "prize_amount": "$<span data-currency-value>25</span>", "registrations_count": 12, "invite_only": false},
+ {"id": 2004, "title": "Winter Data Hack", "url": "https://winter.devpost.com/",
+  "displayed_location": {"location": "Online"}, "submission_period_dates": "Dec 01, 2026 - Jan 15, 2027",
+  "themes": [{"name": "Data"}], "prize_amount": "", "registrations_count": 1500, "invite_only": false},
+ {"id": null, "title": "broken"}
+], "meta": {"total_count": 5, "per_page": 9}}

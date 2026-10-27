@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Secrets: never commit real keys
+.env
+.env.*
+!.env.example
+dashboard/.env*.local
+
+# Build workspace for generated artifacts
+workspace/
+
+# Node / Next.js
+node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/next-env.d.ts
+*.tsbuildinfo
+
+# OS
+.DS_Store

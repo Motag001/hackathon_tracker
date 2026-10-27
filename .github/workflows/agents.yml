@@ -1,0 +1,123 @@
+name: Agents (plan, build, review, analyse, notify)
+
+on:
+  schedule:
+    # Every 3 hours. Runs with nothing to do make no model calls and finish
+    # in about a minute, keeping Actions minutes well inside the free tier.
+    - cron: "23 */3 * * *"
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Single command to run (blank runs the full cycle)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+# Jobs that hold secrets do not use the Actions cache: the sandbox job runs
+# generated code, and a shared cache would be a path to poison later jobs.
+
+concurrency:
+  group: agents
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: agents
+    outputs:
+      staged: ${{ steps.stage.outputs.staged }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ".[skills]"
+      - name: Run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # Passed through the environment, never interpolated into the script.
+          COMMAND: ${{ github.event.inputs.command }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::Agents are not configured yet: add ANTHROPIC_API_KEY, SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to the 'agents' environment secrets (see README). Skipping."
+            exit 0
+          fi
+          if [ -n "$COMMAND" ]; then
+            case "$COMMAND" in
+              plan|build|review|analyse|notify|sync-skills|cycle) hackagent "$COMMAND" ;;
+              *) echo "Unknown command"; exit 1 ;;
+            esac
+          else
+            hackagent cycle
+          fi
+      - name: Stage generated code for the sandbox
+        id: stage
+        run: |
+          if [ -d workspace/sandbox ] && [ -n "$(ls -A workspace/sandbox)" ]; then
+            echo "staged=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "staged=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.stage.outputs.staged == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox
+          path: workspace/sandbox
+          retention-days: 3
+
+  # Runs model-generated tests. No secrets, no token permissions, no
+  # environment: generated code cannot reach the API keys or the database.
+  sandbox:
+    needs: cycle
+    if: needs.cycle.outputs.staged == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions: {}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: hackagent
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest
+      - uses: actions/download-artifact@v4
+        with:
+          name: sandbox
+          path: staged
+      - run: python -m hackagent.sandbox.runner staged report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-report
+          path: report.json
+          retention-days: 3
+
+  record:
+    needs: sandbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: agents
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - uses: actions/download-artifact@v4
+        with:
+          name: sandbox-report
+          path: report
+      - run: hackagent record-tests report/report.json
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

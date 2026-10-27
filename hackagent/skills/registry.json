@@ -1,0 +1,82 @@
+[
+  {
+    "id": "doc_markdown",
+    "name": "Markdown document",
+    "purpose": "Write-ups, READMEs, project descriptions, technical notes.",
+    "inputs": ["outline", "facts and sources"],
+    "outputs": [".md"],
+    "cost_notes": "Mid-tier model; output only."
+  },
+  {
+    "id": "doc_word",
+    "name": "Word document",
+    "purpose": "Formal reports or proposals when the event asks for .docx.",
+    "inputs": ["markdown content"],
+    "outputs": [".docx"],
+    "cost_notes": "Rendered locally from markdown; no extra model cost."
+  },
+  {
+    "id": "doc_pdf",
+    "name": "PDF document",
+    "purpose": "Reports or one-pagers when the event asks for PDF.",
+    "inputs": ["markdown content"],
+    "outputs": [".pdf"],
+    "cost_notes": "Rendered locally from markdown; no extra model cost."
+  },
+  {
+    "id": "slides",
+    "name": "Slide deck",
+    "purpose": "Pitch decks and demo slides.",
+    "inputs": ["slide outline: title and bullets per slide"],
+    "outputs": [".pptx"],
+    "cost_notes": "Rendered locally from a JSON outline."
+  },
+  {
+    "id": "spreadsheet",
+    "name": "Spreadsheet",
+    "purpose": "Tables, budgets, data summaries, evaluation results.",
+    "inputs": ["CSV content"],
+    "outputs": [".xlsx", ".csv"],
+    "cost_notes": "Rendered locally from CSV."
+  },
+  {
+    "id": "code",
+    "name": "Code generation",
+    "purpose": "Application code, scripts, notebooks-as-scripts, configs.",
+    "inputs": ["spec", "interfaces"],
+    "outputs": [".py", ".js", ".ts", ".tsx", ".html", ".css", ".json", ".toml", ".yaml", ".yml", ".sql", ".txt"],
+    "cost_notes": "Mid-tier model; the most token-heavy skill. Keep files small."
+  },
+  {
+    "id": "code_tests",
+    "name": "Code testing",
+    "purpose": "Unit tests for generated Python code, run in an isolated subprocess without secrets.",
+    "inputs": ["code files"],
+    "outputs": ["test_*.py", "test report"],
+    "cost_notes": "Tests are generated with the code; running them costs no tokens."
+  },
+  {
+    "id": "diagram",
+    "name": "Diagram",
+    "purpose": "Architecture and flow diagrams as Mermaid source.",
+    "inputs": ["components and flows"],
+    "outputs": [".mmd"],
+    "cost_notes": "Small output."
+  },
+  {
+    "id": "demo_script",
+    "name": "Demo and video script",
+    "purpose": "Shot-by-shot demo video script and talking points for the owner to record.",
+    "inputs": ["features", "judging criteria", "time limit"],
+    "outputs": [".md"],
+    "cost_notes": "Small output."
+  },
+  {
+    "id": "dataset_card",
+    "name": "Dataset card",
+    "purpose": "Documents a dataset's source, license, fields and limitations.",
+    "inputs": ["dataset metadata"],
+    "outputs": [".md"],
+    "cost_notes": "Small output."
+  }
+]
