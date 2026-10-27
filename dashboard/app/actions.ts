@@ -32,6 +32,16 @@ function parse<T extends z.ZodTypeAny>(schema: T, form: FormData, path: string):
 
 // --- auth -----------------------------------------------------------------
 
+// Supabase answers "invalid_credentials" for both an unknown email and a
+// wrong password, so these messages do not reveal whether an account exists.
+const SIGN_IN_ERRORS: Record<string, string> = {
+  invalid_credentials: "Wrong email or password.",
+  email_not_confirmed:
+    "This email is not confirmed yet. In Supabase, open Authentication → Users and confirm " +
+    "the user (or recreate it with Auto Confirm User ticked).",
+  over_request_rate_limit: "Too many attempts. Wait a minute and try again.",
+};
+
 export async function signIn(form: FormData) {
   const input = z
     .object({ email: z.string().email().max(320), password: z.string().min(1).max(200) })
@@ -39,8 +49,12 @@ export async function signIn(form: FormData) {
   if (!input.success) back("/login", "Enter your email and password.");
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.signInWithPassword(input.data);
-  // One generic message: do not reveal whether the account exists.
-  if (error) back("/login", "Sign-in failed.");
+  if (error) {
+    // Log the Supabase error code only (never the email or password) so
+    // failed sign-ins can be diagnosed from the Vercel runtime logs.
+    console.warn("sign-in failed", { code: error.code ?? null, status: error.status ?? null });
+    back("/login", SIGN_IN_ERRORS[error.code ?? ""] ?? `Sign-in failed (${error.code ?? "unknown"}).`);
+  }
   redirect("/");
 }
 
