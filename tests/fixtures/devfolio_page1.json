@@ -1,0 +1,7 @@
+{"hits": {"hits": [
+ {"_source": {"uuid": "df-1", "name": "ETH Lagos Online", "slug": "ethlagos", "is_online": true,
+   "starts_at": "2026-11-01T09:00:00Z", "ends_at": "2026-11-20T18:00:00Z",
+   "themes": [{"name": "Blockchain"}], "participants_count": 900,
+   "prizes": [{"name": "Grand", "amount": "1000", "currency": "USD"}], "settings": {"reg_ends_at": "2026-11-10T00:00:00Z"}}},
+ {"_source": {"name": "Bad slug", "slug": "../../etc"}}
+]}}
