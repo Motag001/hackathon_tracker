@@ -98,6 +98,8 @@ def test_store_events_prefilters_and_dedupes():
     stats = discovery.store_events(ctx, "devpost", events)
     assert stats["updated"] == 4 and stats["new"] == 0
     assert ctx.store.select("events", {"external_id": "2001"})[0]["status"] == "analyzed"
+    tiny = ctx.store.select("events", {"external_id": "2003"})[0]
+    assert "below" in tiny["raw"]["filter_reason"]  # survives the refresh
 
     # Same event listed on another platform is marked as a duplicate.
     copy = events[0]

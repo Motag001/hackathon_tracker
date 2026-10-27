@@ -22,7 +22,8 @@ log = logging.getLogger(__name__)
 
 # Listing fields, refreshed on every sighting. Status is never overwritten by
 # discovery, and analysis results live in event_rules, so a refresh cannot
-# clobber what the Rules Analyst found.
+# clobber what the Rules Analyst found. ``raw`` is written once, on insert,
+# so the pre-filter reason stored there survives later sightings.
 _REFRESH = (
     "title",
     "url",
@@ -36,7 +37,6 @@ _REFRESH = (
     "is_online",
     "themes",
     "registrants",
-    "raw",
     "dedupe_key",
 )
 
